@@ -1,0 +1,436 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<!--
+
+JOGO DA VELHA
+Um exerc�cio de busca competitiva usando algoritmo MiniMax
+
+Mestrado em Computa��o - PPGC/UFPel
+Disciplina : Fundamentos de IA
+Professores: Ricardo Ara�jo e Paulo Ferreira Jr.
+
+Desenvolvido por Henrique Avila Vianna [hvianna (at) gmail.com]
+maio de 2011
+
+-->
+<head>
+<title>Jogo da Velha - Fundamentos de IA</title>
+
+<style>
+body {
+	font: 13px Verdana;
+}
+h1 {
+	margin-bottom: 0;
+	font: 29px "arial black";
+}
+h2 {
+	margin-top: 0;
+	margin-bottom: 50px;
+	font: bold italic 18px arial;
+}
+#container {
+  width: 780px;
+  margin: auto;
+}
+#quadroesq {
+  float: left;
+  width: 400px;
+}
+#quadrodir {
+  float: left;
+  width: 360px;
+}
+#tabuleiro {
+	border-collapse: collapse;
+}
+#tabuleiro td {
+	width: 100px;
+	height: 100px;
+	font: 60px "arial";
+	text-align: center;
+	vertical-align: center;
+	color: #000;
+}
+#p00,#p01,#p02, #p10,#p11,#p12 {
+	border-bottom: 4px solid #000;
+}
+#p00,#p01, #p10,#p11, #p20,#p21 {
+	border-right: 4px solid #000;
+}
+.clear {
+	clear: both;
+}
+.bloco {
+	float: left;
+	width: 76px;
+	background: url(fundo.png) no-repeat 10px 12px;
+	padding-left: 8px;
+	text-align: center;
+}
+.ativo {
+	background-color: #eee;
+}
+</style>
+
+<!-- Google +1 & Analytics -->
+<script type="text/javascript" src="http://apis.google.com/js/plusone.js"></script>
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-23747942-1']);
+  _gaq.push(['_trackPageview']);
+
+  (function() {
+    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+  })();
+</script>
+<!-- end of Google code -->
+
+<script type="text/javascript">
+			
+var estado = [];	// estado do tabuleiro na tela
+var raiz; 			// primeiro nodo da arvore
+var atual;			// ponteiro para o nodo que representa o estado atual do jogo
+
+var pilha = []; // array de ponteiros para nodo - usada para construir a �rvore
+var nodos = 0;	// nodos na �rvore
+
+/* objeto nodo: 
+
+	{ pai: ponteiro para nodo,
+	  estado: array[3][3] de char,
+	  filhos: array de ponteiros para nodo,
+	  jogador: char,
+	  minimax: int }
+*/
+
+function inicializa() {
+	estado = [ [],[],[] ];
+	raiz = null;
+	atual = null;
+	
+	exibeEstado(estado);
+	
+	document.getElementById("CPUcomeca").style.display = '';
+	document.getElementById("reiniciar").style.display = 'none';
+	document.getElementById("info").style.display = 'none';
+	document.getElementById("infoFilhos").style.display = 'none';
+	document.getElementById("quadroFilhos").innerHTML = '';
+	mostraNetos();
+}
+
+function geraArvore() {
+	pilha = []; // limpa pilha
+	nodos = 0;
+	// gera nodo raiz a partir do estado do tabuleiro na tela (vazio ou com a primeira jogada do humano)
+	raiz = {pai: null, estado: estado, filhos: [], jogador: "O", minimax: null};
+	pilha.push(raiz);	// coloca na pilha
+	
+	document.getElementById("CPUcomeca").style.display = 'none';
+	document.getElementById("info").style.display = '';
+	document.getElementById("info").innerHTML = "Gerando �rvore, aguarde...";
+	
+	while (pilha.length) {		// enquanto houver elementos na pilha
+		nodo = pilha.pop();		// retira um nodo
+		geraFilhos(nodo);		// e gera filhos desse nodo
+	}
+
+	calculaMinimax(raiz);	// calcula valores Minimax a partir da raiz
+	
+	document.getElementById("info").innerHTML = "Tamanho da �rvore: "+nodos+" nodos";
+	atual = raiz;	// situa��o atual do jogo
+}
+	
+	
+function geraFilhos(pai) {
+	var estado = [];
+	var x,y,minimax;
+	var	jogador = (pai.jogador=="X")?"O":"X";	// verifica de quem � a vez de jogar nesse n�vel
+	
+	for (y=0; y<3; y++)
+		for (x=0; x<3; x++)
+			if (pai.estado[y][x] == undefined) {	// se encontrou espa�o vago no tabuleiro
+				estado = copiaEstado(pai.estado);	// gera uma c�pia do estado atual
+				estado[y][x] = jogador;				// adiciona a jogada
+				var nodo = {pai: pai, estado: estado, filhos: [], jogador: jogador, minimax: null};	// cria um novo nodo para o filho
+
+				nodo.minimax = ehTerminal(nodo.estado,0);	// se for nodo terminal, recebe valor de utilidade 
+				pai.filhos.push(nodo);	// adiciona esse nodo no array de filhos do nodo pai
+				nodos++;
+
+				if (!nodo.minimax)		// se filho n�o � terminal, vai para a pilha, para gerar os filhos dele
+					pilha.push(nodo);
+			}
+}
+
+function calculaMinimax(nodo) {	// calcula o valor minimax de um nodo
+	var i, min, max;
+	for (i=0; i < nodo.filhos.length; i++) {	// percorre todos os filhos do nodo
+		if (nodo.filhos[i].minimax === null)	// se um filho ainda n�o tem um valor minimax (n�o � folha da �rvore)
+			calculaMinimax(nodo.filhos[i]);		// chama a fun��o recursivamente para aquele filho
+
+		if (max == undefined || nodo.filhos[i].minimax > max)	// guarda valor max (maior minimax entre os filhos)
+			max = nodo.filhos[i].minimax;
+		if (min == undefined || nodo.filhos[i].minimax < min)	// guarda valor min (menor minimax entre os filhos)
+			min = nodo.filhos[i].minimax;
+	}
+	if (nodo.jogador == "O")
+		nodo.minimax = max;		// se a pr�xima jogada � da CPU, retorna valor max
+	else
+		nodo.minimax = min;		// caso contr�rio, retorna valor min
+}
+
+function ehTerminal(estado,encerra) {	// verifica se estado � terminal, retornando seu valor de utilidade
+	var x,y;							// retorna null caso n�o seja estado terminal
+	var brancos = 0;					// encerra = 0 para calcular o valor de utilidade durante a gera��o da �rvore
+	var utilidade = null;				//         = 1 para encerrar o jogo quando estado for terminal
+	
+	for (y=0; y<3; y++)		// testa linhas
+		if (estado[y][0] != undefined && estado[y][0] == estado[y][1] && estado[y][0] == estado[y][2]) {
+			utilidade = (estado[y][0] == "X")? 1: -1;	// utilidade 1 para X (CPU), -1 para O (humano)
+			break;
+		}
+	if (!utilidade)			// testa colunas
+		for (x=0; x<3; x++)	
+			if (estado[0][x] != undefined && estado[0][x] == estado[1][x] && estado[0][x] == estado[2][x]) {
+				utilidade = (estado[0][x] == "X")? 1: -1;
+				break;
+			}
+	if (!utilidade)			// testa diagonais
+		if ( estado[1][1] != undefined && (
+			 (estado[0][0] == estado[1][1] && estado[0][0] == estado[2][2]) ||
+			 (estado[0][2] == estado[1][1] && estado[0][2] == estado[2][0])    ) )
+			utilidade = (estado[1][1] == "X")? 1: -1;
+				
+	for (y=0; y<3; y++)
+		for (x=0; x<3; x++)
+			if (estado[y][x] == undefined)	// conta espa�os em branco no tabuleiro
+				brancos++;
+				
+	if (utilidade)					// se achou um vencedor
+		if (encerra)
+			if (utilidade > 0)		// utilidade > 0 venceu CPU
+				termina("Eu ganhei!");
+			else
+				termina("Voc� ganhou!");	// essa mensagem nunca ser� exibida :)
+		else
+			return utilidade*(brancos+1); 	// retorna valor de utilidade - n� de casas vagas d� um peso maior,
+											// favorecendo a escolha da jogada vitoriosa no n�vel mais raso
+	else							
+		if (!brancos)				// se n�o tem mais espa�os em branco tamb�m � terminal...
+			if (encerra)
+				termina("Empatamos!");
+			else
+				return 0;			// ...com utilidade 0 (empate)
+		else
+			return null; 			// se ainda tem brancos, n�o � terminal
+}
+
+
+function jogaHumano(elemento) {
+	var i = Number(elemento.id.substr(1,1)); // pega linha a partir da id do elemento (ex. "p02")
+	var j = Number(elemento.id.substr(2,1)); // pega coluna a partir da id do elemento
+
+	if (estado[i][j] != undefined) {
+		alert("Posi��o inv�lida");
+		return;
+	}
+	else {
+		estado[i][j] = "O";		// coloca a jogada do humano
+		exibeEstado(estado);	// atualiza tabuleiro na tela
+	}
+	
+	if (!ehTerminal(estado,1)) {	// verifica se jogada do humano resultou em um estado terminal
+		if (!raiz)			// se raiz � null, �rvore ainda n�o foi gerada (humano come�a o jogo)
+			geraArvore();	// a raiz ser� o estado atual, j� com a jogada do humano
+		else
+			for (i=0;i < atual.filhos.length; i++)	// procura nos filhos do estado atual, qual representa a situa��o ap�s a jogada do humano
+				if (comparaEstados(estado,atual.filhos[i].estado)) {
+					atual = atual.filhos[i];
+					break;
+				}
+		jogaCPU();	// passa a vez para a CPU
+	}
+}
+
+function jogaCPU() {
+	var max;
+	var opcoes = [];	// array das op��es de jogadas
+	var i,r;
+	
+	if (!raiz)			// se raiz � null, �rvore ainda n�o foi gerada (CPU come�a o jogo)
+		geraArvore();
+
+	document.getElementById("infoFilhos").style.display = '';	// limpa exibi��o dos filhos e netos
+	document.getElementById("quadroFilhos").innerHTML = '';
+	mostraNetos();
+	
+	// avalia qual a melhor op��o de jogada, dentre as poss�veis (filhos do estado atual)
+	for (i=0;i < atual.filhos.length; i++) {
+		mostraFilho(atual.filhos[i],i,0);
+		if (atual.filhos[i].minimax != null && (max == undefined || atual.filhos[i].minimax > max))
+			max = atual.filhos[i].minimax;	// salva maior valor minimax dos filhos
+	}
+	
+	// percorre novamente os filhos, checando todos que tenham o mesmo valor minimax �timo
+	for (i=0;i < atual.filhos.length; i++)
+		if (atual.filhos[i].minimax == max)
+			opcoes.push(i);	// coloca �ndice deste filho no array de op��es de jogada
+		
+	// e escolhe aleatoriamente um deles, para dar mais variedade �s jogadas
+	r = Math.floor(Math.random()*opcoes.length);
+	atual = atual.filhos[opcoes[r]];
+	estado = atual.estado;
+	exibeEstado(estado);
+	
+	ehTerminal(estado,1);	// Verifica se atingiu estado terminal, encerrando o jogo 
+}
+
+/* fun��es de display */
+
+function exibeEstado(estado) {	// atualiza tabuleiro na tela
+	for (var i=0; i<3; i++)
+		for (var j=0; j<3; j++) {
+			elemento = document.getElementById("p"+i+j);
+			if (estado[i][j] == undefined)
+				elemento.innerHTML = "&nbsp;";
+			else
+				elemento.innerHTML = estado[i][j];
+		}
+}
+
+function mostraFilho(nodo,i,n) {	// adiciona um nodo aos blocos de filhos ou netos, abaixo do tabuleiro
+	var html;						// n=0 filhos, n=1 netos
+	var x,y;
+	
+	if (n == 0)
+		html = "<div class='bloco' id='b"+i+"' onClick='mostraNetos("+i+")'><pre>";	// gera blocos de filhos
+	else
+		html = "<div class='bloco ativo'><pre>";	// gera blocos de netos
+	
+	for (y=0; y<3; y++) {
+		for (x=0; x<3; x++)
+			if (nodo.estado[y][x] == undefined)
+				html += "   ";
+			else
+				html += nodo.estado[y][x]+"  ";
+		html += "\n";
+	}
+	html += nodo.minimax+"</pre></div>\n";
+	
+	if (n == 0) {
+		document.getElementById("quadroFilhos").innerHTML += html;
+		document.getElementById("quadroNetos"+i).innerHTML = '';
+		for (x=0; x < nodo.filhos.length; x++)
+			mostraFilho(nodo.filhos[x],i,1); // chama a fun��o para gerar os blocos de netos
+	}
+	else
+		document.getElementById("quadroNetos"+i).innerHTML += html;
+}
+
+function mostraNetos(n) {	// mostra/oculta blocos de netos
+	var i;
+	if (n != undefined)
+		if (document.getElementById("quadroNetos"+n).style.display == '')	// se j� est� exibido, tem que ocultar
+			n = undefined;	
+	for (i=0; i<9; i++) {	// oculta todos os blocos
+		document.getElementById("quadroNetos"+i).style.display = 'none';
+		if (document.getElementById("b"+i))
+			document.getElementById("b"+i).className = 'bloco';			// desmarca os pais (tira classe 'ativo')
+	}
+	if (n != undefined) {	// exibe o bloco desejado
+		document.getElementById("quadroNetos"+n).style.display = '';
+		if (document.getElementById("b"+n))
+			document.getElementById("b"+n).className = 'bloco ativo';	// marca o bloco do pai 
+	}
+}
+
+function termina(msg) {
+	alert(msg);
+	document.getElementById("reiniciar").style.display = '';
+	document.getElementById("CPUcomeca").style.display = 'none';
+}
+
+/* fun��es auxiliares */
+
+function copiaEstado(estado) {
+	var retorno = [];
+	for(var i = 0; i < estado.length; i++)	// copia elementos do array
+		retorno[i] = estado[i].slice(0);	// necess�rio para evitar a c�pia por refer�ncia
+    
+	return retorno;
+}
+
+function comparaEstados(estado1,estado2) {
+	for (var i=0; i<3; i++)
+		for (var j=0; j<3; j++)
+			if (estado1[i][j] != estado2[i][j])
+				return false;
+				
+	return true;
+}
+
+
+</script>
+</head>
+
+<body onLoad="inicializa();">
+
+<div id="container">
+  <div style="float:right">
+	<!-- Google +1 button -->
+	<g:plusone></g:plusone>
+  </div>
+  <h1>Jogo da Velha - Fundamentos de IA</h1>
+  <h2>Um exerc�cio de busca competitiva usando algoritmo MiniMax</h2>
+  <div id="quadroesq">
+    <table id="tabuleiro">
+    <tr>
+      <td id="p00" onClick="jogaHumano(this);"></td>
+      <td id="p01" onClick="jogaHumano(this);"></td>
+      <td id="p02" onClick="jogaHumano(this);"></td>
+    </tr>
+    <tr>
+      <td id="p10" onClick="jogaHumano(this);"></td>
+      <td id="p11" onClick="jogaHumano(this);"></td>
+      <td id="p12" onClick="jogaHumano(this);"></td>
+    </tr>
+    <tr>
+      <td id="p20" onClick="jogaHumano(this);"></td>
+      <td id="p21" onClick="jogaHumano(this);"></td>
+      <td id="p22" onClick="jogaHumano(this);"></td>
+    </tr>
+    </table>
+  </div>
+
+  <div id="quadrodir">
+    <br>
+    <form>
+      X = CPU<br>
+      O = Humano<br><br>
+      Clique em uma posi��o do tabuleiro para jogar<br><br><br>
+      <input type="button" id="CPUcomeca" value=" CPU come�a " onClick="jogaCPU();">
+      <input type="button" id="reiniciar" value=" Jogar novamente " onClick="inicializa();">
+    </form>
+
+    <br><br>
+    <div id="info"></div>
+  </div>
+  
+  <div id="infoFilhos" class="clear"><br>Nodos avaliados para esta jogada: (clique em um para ver seus sucessores)</div>
+  <div id="quadroFilhos" class="clear"></div>
+  <div id="quadroNetos0" class="clear"></div>
+  <div id="quadroNetos1" class="clear"></div>
+  <div id="quadroNetos2" class="clear"></div>
+  <div id="quadroNetos3" class="clear"></div>
+  <div id="quadroNetos4" class="clear"></div>
+  <div id="quadroNetos5" class="clear"></div>
+  <div id="quadroNetos6" class="clear"></div>
+  <div id="quadroNetos7" class="clear"></div>
+  <div id="quadroNetos8" class="clear"></div>
+</div>
+
+</body>
+</html>
