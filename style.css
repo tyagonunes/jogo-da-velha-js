@@ -4,7 +4,7 @@ td {
     width: 100px;
     text-align: center;
     vertical-align: middle;
-    font-family: "Comic Sans MS", cursive, sans-serif;
+    font-family: "Roboto", sans-serif;
     font-size: 70px;
     cursor: pointer;
 }
@@ -33,7 +33,7 @@ table tr td:last-child {
     border-right: 0;
 }
 
-.endGame {
+.fimDeJogo {
     display: none;
     width: 200px;
     top: 120px;
